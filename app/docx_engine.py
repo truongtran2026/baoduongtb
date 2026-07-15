@@ -1,5 +1,10 @@
-"""Fills [[placeholder]] tags in the legacy .docx templates and writes the
-result to disk in a way that can't hit Windows' MAX_PATH crash.
+"""Fills [[placeholder]] tags in the legacy .docx templates and returns the
+result as bytes (the database is the source of truth for every deployment,
+including a serverless one with no persistent local disk). On a deployment
+that does have a real local filesystem (the LAN app), the same bytes are
+also best-effort mirrored to disk so "Mở thư mục" / Explorer still works
+there - and that write goes through a path that can't hit Windows' MAX_PATH
+crash.
 
 Word frequently splits a single visible token like "[[thietbi]]" across
 several <w:r> runs (spell-check, autocorrect, mid-edit formatting changes),
@@ -9,6 +14,7 @@ back into the first run of the matched span and blanks out the rest -
 matching what Word's own Find/Replace does visually.
 """
 import hashlib
+import io
 import os
 import re
 from dataclasses import dataclass
@@ -95,11 +101,18 @@ def find_placeholders(document: Document) -> set[str]:
     return found
 
 
-def fill_template(template_path: Path, mapping: dict) -> Document:
-    document = Document(str(template_path))
+def fill_template(template_bytes: bytes, mapping: dict) -> Document:
+    document = Document(io.BytesIO(template_bytes))
     for paragraph in _iter_all_paragraphs(document):
         replace_placeholders_in_paragraph(paragraph, mapping)
     return document
+
+
+def render_to_bytes(template_bytes: bytes, mapping: dict) -> bytes:
+    document = fill_template(template_bytes, mapping)
+    buffer = io.BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
 
 
 def sanitize_filename_component(text: str) -> str:
@@ -151,31 +164,44 @@ WARN_PATH_LENGTH = 240  # heads-up threshold well under the classic 260-char lim
 class GenerateResult:
     filename: str
     full_path: str
+    content: bytes | None
     status: str  # success | warning | error
     message: str = ""
 
 
-def generate_one(template_path: Path, output_dir: Path, prefix: str, maintenance_date: date,
+def generate_one(template_bytes: bytes, output_dir: Path | None, prefix: str, maintenance_date: date,
                   device_name: str, station_code: str, mapping: dict) -> GenerateResult:
     filename, truncated = build_output_filename(prefix, maintenance_date, device_name, station_code)
-    target = output_dir / filename
 
     warnings = []
     if truncated:
         warnings.append("Tên thiết bị quá dài nên đã được rút gọn trong tên file")
-    if len(str(target.resolve())) > WARN_PATH_LENGTH:
-        warnings.append("Đường dẫn khá dài (đã dùng chế độ chống lỗi Windows MAX_PATH)")
 
     try:
-        ensure_dir(output_dir)
-        document = fill_template(template_path, mapping)
-        document.save(long_path(target))
+        content = render_to_bytes(template_bytes, mapping)
     except Exception as exc:  # noqa: BLE001 - surfaced to the user, one device shouldn't abort the whole batch
-        return GenerateResult(filename=filename, full_path=str(target), status="error", message=str(exc))
+        return GenerateResult(filename=filename, full_path="", content=None, status="error", message=str(exc))
+
+    full_path = ""
+    if output_dir is not None:
+        # Best-effort mirror to local disk (LAN deployment only - there's no
+        # writable filesystem on a serverless deployment). The database copy
+        # above is what downloads/history actually read from, so a failure
+        # here never turns a successful generation into an error.
+        target = output_dir / filename
+        full_path = str(target)
+        if len(full_path) > WARN_PATH_LENGTH:
+            warnings.append("Đường dẫn khá dài (đã dùng chế độ chống lỗi Windows MAX_PATH)")
+        try:
+            ensure_dir(output_dir)
+            Path(long_path(target)).write_bytes(content)
+        except Exception:
+            pass
 
     return GenerateResult(
         filename=filename,
-        full_path=str(target),
+        full_path=full_path,
+        content=content,
         status="warning" if warnings else "success",
         message="; ".join(warnings),
     )

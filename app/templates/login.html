@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng nhập — Bảo dưỡng thiết bị</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); padding:20px;">
+  <div class="card" style="width:100%; max-width:380px;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;">
+      <div class="logo-dot">BD</div>
+      <div style="font-weight:700; font-size:15px;">Bảo dưỡng C3<br><small style="font-weight:400; color:var(--text-muted); font-size:12px;">Hồ sơ &amp; phiếu bảo dưỡng</small></div>
+    </div>
+
+    {% if request.query_params.get('error') %}
+      <div class="flash flash-error">⚠ {{ request.query_params.get('error') }}</div>
+    {% endif %}
+
+    <form method="post" action="/login">
+      <div class="field">
+        <label>Tên đăng nhập</label>
+        <input type="text" name="username" required autofocus>
+      </div>
+      <div class="field">
+        <label>Mật khẩu</label>
+        <input type="password" name="password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

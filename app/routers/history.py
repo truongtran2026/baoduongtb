@@ -4,28 +4,32 @@ import zipfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
 from .. import models
-from ..database import get_db
+from ..database import IS_SQLITE, get_db
 from ..docx_engine import long_path
 from ..templating import templates
 
 router = APIRouter()
 
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 def _delete_runs(db: Session, run_ids: list[int]) -> int:
-    """Deletes the generated .docx files from disk (best-effort - a file
-    already moved/removed by the user shouldn't block cleanup) plus the
-    GenerationRun/GeneratedFile rows. Returns how many runs were deleted."""
+    """Deletes the GenerationRun/GeneratedFile rows (which is where the file
+    content actually lives now) plus, best-effort, any local disk mirror
+    from the LAN deployment - a file already moved/removed by the user, or
+    one that was never written to disk in cloud mode, shouldn't block
+    cleanup either way."""
     runs = db.query(models.GenerationRun).filter(models.GenerationRun.id.in_(run_ids)).all()
     for run in runs:
-        for f in run.files:
-            if f.status in ("success", "warning"):
-                Path(long_path(Path(f.full_path))).unlink(missing_ok=True)
+        if IS_SQLITE:
+            for f in run.files:
+                if f.status in ("success", "warning") and f.full_path:
+                    Path(long_path(Path(f.full_path))).unlink(missing_ok=True)
         db.delete(run)
     db.commit()
     return len(runs)
@@ -51,7 +55,7 @@ def run_detail(run_id: int, request: Request, db: Session = Depends(get_db)):
     if run is None:
         return RedirectResponse("/history?error=Không tìm thấy lượt tạo file", status_code=303)
     files = db.query(models.GeneratedFile).filter_by(run_id=run_id).order_by(models.GeneratedFile.filename).all()
-    can_open_locally = (request.client.host if request.client else "") in LOOPBACK_HOSTS
+    can_open_locally = IS_SQLITE and (request.client.host if request.client else "") in LOOPBACK_HOSTS
     return templates.TemplateResponse(
         "history_detail.html",
         {"request": request, "run": run, "files": files, "can_open_locally": can_open_locally, "active_nav": "history"},
@@ -76,7 +80,7 @@ def bulk_delete_runs(run_ids: list[int] = Form(default=[]), db: Session = Depend
 def open_folder(run_id: int, request: Request, db: Session = Depends(get_db)):
     run = db.get(models.GenerationRun, run_id)
     client_host = request.client.host if request.client else ""
-    if run and client_host in LOOPBACK_HOSTS and Path(run.output_folder).exists():
+    if IS_SQLITE and run and client_host in LOOPBACK_HOSTS and Path(run.output_folder).exists():
         subprocess.Popen(["explorer.exe", run.output_folder])
     return RedirectResponse(f"/history/{run_id}", status_code=303)
 
@@ -95,9 +99,8 @@ def download_run_zip(run_id: int, db: Session = Depends(get_db)):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in files:
-            p = Path(long_path(Path(f.full_path)))
-            if p.exists():
-                zf.write(p, arcname=f.filename)
+            if f.content:
+                zf.writestr(f.filename, f.content)
     buffer.seek(0)
     zip_name = f"baoduong_run_{run_id}.zip"
     return StreamingResponse(
@@ -110,9 +113,10 @@ def download_run_zip(run_id: int, db: Session = Depends(get_db)):
 @router.get("/history/{run_id}/files/{file_id}/download")
 def download_single_file(run_id: int, file_id: int, db: Session = Depends(get_db)):
     f = db.query(models.GeneratedFile).filter_by(id=file_id, run_id=run_id).first()
-    if f is None:
+    if f is None or not f.content:
         return RedirectResponse(f"/history/{run_id}?error=Không tìm thấy file", status_code=303)
-    p = Path(long_path(Path(f.full_path)))
-    if not p.exists():
-        return RedirectResponse(f"/history/{run_id}?error=File không còn tồn tại trên máy chủ", status_code=303)
-    return FileResponse(str(p), filename=f.filename)
+    return Response(
+        content=f.content,
+        media_type=DOCX_MEDIA_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
+    )

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, event
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -9,9 +9,25 @@ from .database import Base, engine
 
 @event.listens_for(Engine, "connect")
 def _enable_sqlite_fk(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+    # Postgres enforces FKs natively and doesn't understand this PRAGMA -
+    # only run it for the local SQLite (LAN/offline) deployment mode.
+    if engine.dialect.name == "sqlite":
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+class User(Base):
+    """Login accounts. Only needed once the app is reachable over the public
+    internet (cloud deployment) rather than gated by LAN access alone."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    display_name: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class Station(Base):
@@ -90,12 +106,26 @@ class Device(Base):
 
 
 class WordTemplate(Base):
+    """The .docx template's bytes live in the database (`content`), not on
+    local disk - a serverless deployment (Vercel) has no persistent
+    filesystem to keep uploads on between requests. `stored_filename` is kept
+    (still populated, just no longer resolves to a real path) purely so an
+    existing local SQLite database from before this change doesn't end up
+    with a NOT NULL column that nothing supplies a value for."""
+
     __tablename__ = "word_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     original_filename: Mapped[str] = mapped_column(String(255))
     stored_filename: Mapped[str] = mapped_column(String(255))
+    # `Mapped[bytes]` (not `bytes | None`) is deliberate: SQLAlchemy 2.0.35's
+    # declarative scanner can't resolve `X | None` PEP 604 unions on this
+    # Python version (crashes at class-definition time - a real
+    # SQLAlchemy/Python compatibility bug, not a typo). nullable=True below
+    # still makes the actual database column nullable; only the static type
+    # hint is slightly optimistic.
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -131,6 +161,12 @@ class GenerationRun(Base):
 
 
 class GeneratedFile(Base):
+    """`content` holds the actual generated .docx bytes (source of truth for
+    downloads on every deployment). `full_path` is kept for the LAN
+    deployment's "best effort" write to a real folder on disk (so Explorer /
+    "Mở thư mục" still works there) - on a serverless deployment that write
+    never happens and full_path is just descriptive text, not a real path."""
+
     __tablename__ = "generated_files"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -138,6 +174,7 @@ class GeneratedFile(Base):
     device_name_snapshot: Mapped[str] = mapped_column(String(255))
     filename: Mapped[str] = mapped_column(Text)
     full_path: Mapped[str] = mapped_column(Text)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)  # see WordTemplate.content docstring
     status: Mapped[str] = mapped_column(String(20))  # success | warning | error
     message: Mapped[str] = mapped_column(Text, default="")
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import IS_SQLITE, get_db
 from ..paths import DEFAULT_OUTPUT_DIR
 from ..settings_store import OUTPUT_ROOT_KEY, get_output_root, set_setting
 from ..templating import templates
@@ -19,6 +19,7 @@ def show_settings(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "output_root": str(output_root),
             "default_output_root": str(DEFAULT_OUTPUT_DIR),
+            "is_sqlite": IS_SQLITE,
             "active_nav": "settings",
         },
     )

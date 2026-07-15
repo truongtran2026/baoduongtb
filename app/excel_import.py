@@ -13,7 +13,6 @@ table is referenced by history (generation runs only keep a text snapshot of
 names), so this is safe. Stations and categories are never auto-deleted this
 way since real history rows do reference them by id.
 """
-import shutil
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -255,8 +254,10 @@ def import_from_workbook(db: Session, xlsx_path: Path) -> ImportSummary:
     return summary
 
 
-def seed_word_templates(db: Session, templates_src_dir: Path, templates_dest_dir: Path, summary: ImportSummary):
-    templates_dest_dir.mkdir(parents=True, exist_ok=True)
+def seed_word_templates(db: Session, templates_src_dir: Path, summary: ImportSummary):
+    """LAN-mode-only convenience (see main._auto_seed_from_legacy_project):
+    reads the legacy .docx templates from local disk and stores their bytes
+    in the database, same as a manual upload through the Categories page."""
     categories = {c.code: c for c in db.query(models.Category).all()}
 
     for code, filename in TEMPLATE_FILE_BY_CODE.items():
@@ -273,13 +274,12 @@ def seed_word_templates(db: Session, templates_src_dir: Path, templates_dest_dir
         if existing_active is not None:
             continue  # already seeded
 
-        stored_name = f"{uuid.uuid4().hex}.docx"
-        shutil.copyfile(src, templates_dest_dir / stored_name)
         db.add(
             models.WordTemplate(
                 category_id=category.id,
                 original_filename=filename,
-                stored_filename=stored_name,
+                stored_filename=f"{uuid.uuid4().hex}.docx",
+                content=src.read_bytes(),
                 is_active=True,
             )
         )

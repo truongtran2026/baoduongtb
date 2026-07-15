@@ -19,6 +19,32 @@ Double-click **`run.bat`**. Trình duyệt sẽ tự mở `http://127.0.0.1:8899
   Windows Firewall có đang chặn cổng 8899 không.
 - Đóng cửa sổ console (hoặc Ctrl+C) để tắt máy chủ.
 
+## Chạy trên cloud (Vercel) thay vì mạng LAN
+
+Mặc định ứng dụng chạy ở **chế độ LAN**: dữ liệu lưu trong 1 file SQLite trên ổ đĩa, không cần đăng nhập (an
+toàn vì chỉ ai vào được mạng nội bộ mới vào được app). Đây là chế độ dùng khi chạy bằng `run.bat`.
+
+Nếu cần truy cập từ Internet (không chỉ trong mạng cơ quan), phải chuyển sang **chế độ cloud** — khác biệt
+quan trọng: dùng database Postgres thay vì file SQLite (máy chủ serverless không có ổ đĩa lưu lâu dài), và
+**bắt buộc đăng nhập** vì bất kỳ ai có link cũng vào được.
+
+Các bước triển khai lên Vercel:
+
+1. **Tạo database Postgres**: trong dashboard Vercel, vào project → tab Storage → tạo một Postgres database
+   (hoặc dùng Postgres từ Neon/Supabase/Railway... đều được) và liên kết vào project. Vercel sẽ tự thêm biến
+   môi trường `POSTGRES_URL`.
+2. **Thêm các biến môi trường khác** (Project → Settings → Environment Variables) — xem file `.env.example`:
+   - `SESSION_SECRET`: chuỗi ngẫu nhiên dài để ký session đăng nhập. Tạo bằng:
+     `python -c "import secrets; print(secrets.token_hex(32))"`
+   - `ADMIN_USERNAME`, `ADMIN_PASSWORD`: tài khoản quản trị đầu tiên, tự tạo khi khởi động lần đầu (chỉ tạo
+     nếu chưa có tài khoản nào).
+3. **Deploy**: kết nối repo GitHub này với Vercel (Import Project), Vercel tự nhận cấu hình từ `vercel.json`.
+4. Sau khi deploy xong, vào bằng tài khoản `ADMIN_USERNAME`/`ADMIN_PASSWORD` đã đặt ở bước 2.
+
+Vì đây là database Postgres hoàn toàn mới/trống, bạn cần **Nhập từ Excel** lại dữ liệu (trạm, nhân viên, thiết
+bị, mục bảo dưỡng) và tải lên lại các file mẫu Word — xem phần "Cập nhật dữ liệu bằng Excel" bên dưới. Có thể
+dùng chính file `.xlsx` đã xuất ra từ bản LAN.
+
 ## Lần chạy đầu tiên — dữ liệu có sẵn
 
 Nếu thư mục `ProjectBDTB_Old` (chứa `taofilebdV3.0.xlsm` và các file mẫu) vẫn nằm cạnh thư mục ứng dụng này,
@@ -93,9 +119,11 @@ vượt quá giới hạn 260 ký tự của Windows khiến Word.SaveAs báo l�
 
 ## Cấu trúc dữ liệu
 
-Toàn bộ dữ liệu nằm trong `app/data/`:
-- `app.db` — cơ sở dữ liệu (trạm, nhân viên, thiết bị, mục bảo dưỡng, lịch sử tạo file)
-- `word_templates/` — các file mẫu .docx đã tải lên
-- `output/` — hồ sơ Word đã tạo (mặc định; có thể đổi ở trang Cài đặt)
+Mọi dữ liệu (trạm, nhân viên, thiết bị, mục bảo dưỡng, file mẫu Word, hồ sơ đã tạo, lịch sử) nằm trong **cơ sở
+dữ liệu** — không nằm rải rác trên ổ đĩa. Ở chế độ LAN đó là 1 file duy nhất `app/data/app.db`; sao lưu định kỳ
+chỉ cần copy file này. Ở chế độ cloud đó là database Postgres đã kết nối — sao lưu theo cách của nhà cung cấp
+Postgres bạn dùng (Vercel/Neon/Supabase đều có tính năng backup tự động).
 
-Sao lưu định kỳ bằng cách copy cả thư mục `app/data/`.
+Riêng ở chế độ LAN, mỗi hồ sơ Word tạo ra còn được ghi thêm 1 bản trên ổ đĩa tại `app/data/output/<mục bảo
+dưỡng>/` để có thể "Mở thư mục" xem trực tiếp bằng Explorer — bản ghi trong database mới là bản chính, bản trên
+đĩa chỉ là tiện ích thêm.

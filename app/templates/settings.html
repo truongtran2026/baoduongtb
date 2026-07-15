@@ -8,6 +8,7 @@
   </div>
 </div>
 
+{% if is_sqlite %}
 <div class="card" style="max-width:640px;">
   <div class="card-title">Thư mục lưu hồ sơ đã tạo</div>
   <p class="card-subtitle">
@@ -23,6 +24,15 @@
     <button type="submit" class="btn btn-primary">Lưu</button>
   </form>
 </div>
+{% else %}
+<div class="card" style="max-width:640px;">
+  <div class="card-title">Nơi lưu hồ sơ đã tạo</div>
+  <p class="card-subtitle" style="margin-bottom:0;">
+    Bản chạy trên cloud này không có ổ đĩa cục bộ để lưu file, nên mọi hồ sơ tạo ra được lưu trực tiếp trong
+    cơ sở dữ liệu — xem và tải lại ở trang Lịch sử tạo file.
+  </p>
+</div>
+{% endif %}
 
 <div class="card" style="max-width:640px;">
   <div class="card-title">Về ứng dụng</div>

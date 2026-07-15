@@ -51,6 +51,16 @@
         Cài đặt
       </a>
     </div>
+    {% if require_login %}
+    <div class="nav-group" style="margin-top:18px;">
+      <form method="post" action="/logout">
+        <button type="submit" class="nav-link" style="width:100%; border:none; background:none; cursor:pointer; text-align:left; font:inherit;">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>
+          Đăng xuất{% if request.session.get('username') %} ({{ request.session.get('username') }}){% endif %}
+        </button>
+      </form>
+    </div>
+    {% endif %}
     <div class="sidebar-footer">Bảo dưỡng thiết bị v1.0<br>Thay thế công cụ Excel/VBA cũ</div>
   </aside>
 

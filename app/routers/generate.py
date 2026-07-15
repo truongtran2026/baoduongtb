@@ -6,8 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import docx_engine, models, schemas
-from ..database import get_db
-from ..paths import WORD_TEMPLATES_DIR
+from ..database import IS_SQLITE, get_db
 from ..settings_store import get_output_root
 from ..templating import templates
 
@@ -96,14 +95,11 @@ def run_generate(payload: schemas.GenerateRequest, request: Request, db: Session
     template_row = (
         db.query(models.WordTemplate).filter_by(category_id=category.id, is_active=True).first()
     )
-    if template_row is None:
+    if template_row is None or not template_row.content:
         return JSONResponse(
             {"detail": f"Mục '{category.name}' chưa có file mẫu Word. Hãy tải lên ở trang Mục bảo dưỡng."},
             status_code=400,
         )
-    template_path = WORD_TEMPLATES_DIR / template_row.stored_filename
-    if not template_path.exists():
-        return JSONResponse({"detail": "File mẫu Word bị thiếu trên máy chủ"}, status_code=400)
 
     devices = (
         db.query(models.Device)
@@ -117,7 +113,11 @@ def run_generate(payload: schemas.GenerateRequest, request: Request, db: Session
     if not devices:
         return JSONResponse({"detail": "Không có thiết bị nào được chọn"}, status_code=400)
 
-    output_dir = get_output_root(db) / category.output_folder_name
+    output_dir = get_output_root(db) / category.output_folder_name if IS_SQLITE else None
+    output_folder_display = (
+        str(output_dir.resolve()) if output_dir is not None
+        else "Lưu trong cơ sở dữ liệu (không có thư mục cục bộ ở chế độ cloud)"
+    )
 
     run = models.GenerationRun(
         station_id=station.id,
@@ -126,7 +126,7 @@ def run_generate(payload: schemas.GenerateRequest, request: Request, db: Session
         performed_by=performed_by,
         coworker=coworker,
         requested_count=len(devices),
-        output_folder=str(output_dir.resolve()),
+        output_folder=output_folder_display,
     )
     db.add(run)
     db.flush()
@@ -151,7 +151,7 @@ def run_generate(payload: schemas.GenerateRequest, request: Request, db: Session
             "nguoiphoihop": coworker,
         }
         result = docx_engine.generate_one(
-            template_path=template_path,
+            template_bytes=template_row.content,
             output_dir=output_dir,
             prefix=category.filename_prefix,
             maintenance_date=payload.maintenance_date,
@@ -172,6 +172,7 @@ def run_generate(payload: schemas.GenerateRequest, request: Request, db: Session
                 device_name_snapshot=device.name,
                 filename=result.filename,
                 full_path=result.full_path,
+                content=result.content,
                 status=result.status,
                 message=result.message,
             )
@@ -194,7 +195,7 @@ def run_generate(payload: schemas.GenerateRequest, request: Request, db: Session
         success_count=success,
         warning_count=warning,
         error_count=error,
-        output_folder=str(output_dir.resolve()),
-        can_open_locally=client_host in LOOPBACK_HOSTS,
+        output_folder=output_folder_display,
+        can_open_locally=IS_SQLITE and client_host in LOOPBACK_HOSTS,
         files=file_results,
     )

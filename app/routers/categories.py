@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..database import get_db
-from ..paths import WORD_TEMPLATES_DIR
 from ..templating import templates
 
 router = APIRouter()
@@ -123,17 +122,15 @@ async def upload_template(category_id: int, template_file: UploadFile, db: Sessi
     if not template_file.filename.lower().endswith(".docx"):
         return RedirectResponse("/categories?error=File mẫu phải có định dạng .docx", status_code=303)
 
-    stored_name = f"{uuid.uuid4().hex}.docx"
-    dest = WORD_TEMPLATES_DIR / stored_name
     content = await template_file.read()
-    dest.write_bytes(content)
 
     db.query(models.WordTemplate).filter_by(category_id=category_id, is_active=True).update({"is_active": False})
     db.add(
         models.WordTemplate(
             category_id=category_id,
             original_filename=template_file.filename,
-            stored_filename=stored_name,
+            stored_filename=f"{uuid.uuid4().hex}.docx",
+            content=content,
             is_active=True,
         )
     )
