@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Bảo dưỡng thiết bị{% endblock %}</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%226%22 fill=%22%232563eb%22/><path d=%22M7 12h10M12 7v10%22 stroke=%22white%22 stroke-width=%222%22 stroke-linecap=%22round%22/></svg>">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo-dot">BD</div>
+      <div class="brand-text">Bảo dưỡng C3
+        <small>Hồ sơ &amp; phiếu bảo dưỡng</small>
+      </div>
+    </div>
+    <nav class="nav-group">
+      <a class="nav-link {% if active_nav == 'generate' %}active{% endif %}" href="/generate">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15h6"/></svg></span>
+        Tạo hồ sơ bảo dưỡng
+      </a>
+      <a class="nav-link {% if active_nav == 'history' %}active{% endif %}" href="/history">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+        Lịch sử tạo file
+      </a>
+    </nav>
+    <div class="nav-group" style="margin-top:18px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-500); padding: 8px 12px 4px;">Dữ liệu dùng chung</div>
+      <a class="nav-link {% if active_nav == 'stations' %}active{% endif %}" href="/stations">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V8l6-4 6 4v13M10 21v-6h4v6"/></svg></span>
+        Trạm viễn thông
+      </a>
+      <a class="nav-link {% if active_nav == 'devices' %}active{% endif %}" href="/devices">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM4 9h2M4 15h2M18 9h2M18 15h2M9 4v2M15 4v2M9 18v2M15 18v2"/></svg></span>
+        Thiết bị
+      </a>
+      <a class="nav-link {% if active_nav == 'categories' %}active{% endif %}" href="/categories">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+        Mục bảo dưỡng &amp; mẫu Word
+      </a>
+      <a class="nav-link {% if active_nav == 'employees' %}active{% endif %}" href="/employees">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        Nhân viên
+      </a>
+    </div>
+    <div class="nav-group" style="margin-top:18px;">
+      <a class="nav-link {% if active_nav == 'settings' %}active{% endif %}" href="/settings">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        Cài đặt
+      </a>
+    </div>
+    <div class="sidebar-footer">Bảo dưỡng thiết bị v1.0<br>Thay thế công cụ Excel/VBA cũ</div>
+  </aside>
+
+  <main class="main">
+    {% if request.query_params.get('ok') %}
+      <div class="flash flash-ok">✓ {{ request.query_params.get('ok') }}</div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+      <div class="flash flash-error">⚠ {{ request.query_params.get('error') }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

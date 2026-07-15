@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Thiết bị{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Thiết bị</h1>
+    <p>Danh sách thiết bị cần bảo dưỡng theo trạm và mục bảo dưỡng.</p>
+  </div>
+  <div class="header-actions">
+    <a class="btn btn-secondary" href="/export-excel">⬇ Xuất Excel</a>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('importPanel')">⬆ Nhập từ Excel</button>
+    <button type="button" class="btn btn-primary" onclick="togglePanel('addPanel')">+ Thêm thiết bị</button>
+  </div>
+</div>
+
+<div class="card-grid" style="margin-bottom:20px;">
+  <div class="stat-card">
+    <div class="stat-value">{{ total }}</div>
+    <div class="stat-label">Thiết bị đang hiển thị (theo bộ lọc)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ grand_total }}</div>
+    <div class="stat-label">Tổng số thiết bị (tất cả trạm)</div>
+  </div>
+</div>
+
+<div class="panel card" id="importPanel">
+  <div class="card-title">Nhập dữ liệu từ file Excel</div>
+  <p class="card-subtitle">
+    Dùng đúng file đã "Xuất Excel" trước đó (hoặc file cùng cấu trúc: các sheet "tram", "nhan vien", "muc",
+    "thiet bi"). Dữ liệu trùng mã sẽ được cập nhật; trạm/nhân viên/thiết bị nào có trong app mà không còn
+    trong file sẽ tự động bị xoá — hãy chắc file bạn nhập là bản đầy đủ, mới nhất.
+  </p>
+  <form method="post" action="/import-excel" enctype="multipart/form-data">
+    <input type="hidden" name="back_to" value="/devices">
+    <div class="field" style="max-width:420px;"><input type="file" name="excel_file" accept=".xlsx,.xlsm" required></div>
+    <button type="submit" class="btn btn-primary">Nhập dữ liệu</button>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('importPanel')">Huỷ</button>
+  </form>
+</div>
+
+<div class="panel card" id="addPanel">
+  <div class="card-title">Thêm thiết bị mới</div>
+  <form method="post" action="/devices">
+    <div class="field-row">
+      <div class="field">
+        <label>Trạm</label>
+        <select name="station_id" required>
+          {% for s in stations %}<option value="{{ s.id }}">{{ s.code }} — {{ s.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Mục bảo dưỡng</label>
+        <select name="category_id" required>
+          {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Tên thiết bị</label><input type="text" name="name" required></div>
+      <div class="field"><label>Số hồ sơ</label><input type="text" name="record_no"></div>
+      <div class="field"><label>Cấu hình</label><input type="text" name="configuration"></div>
+    </div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('addPanel')">Huỷ</button>
+  </form>
+</div>
+
+<div class="card">
+  <form method="get" action="/devices" class="field-row" style="align-items:end;">
+    <div class="field" style="margin-bottom:0;">
+      <label>Trạm</label>
+      <select name="station_id" onchange="this.form.submit()">
+        <option value="">Tất cả trạm</option>
+        {% for s in stations %}<option value="{{ s.id }}" {{ "selected" if filter_station_id == s.id }}>{{ s.code }} — {{ s.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Mục bảo dưỡng</label>
+      <select name="category_id" onchange="this.form.submit()">
+        <option value="">Tất cả mục</option>
+        {% for c in categories %}<option value="{{ c.id }}" {{ "selected" if filter_category_id == c.id }}>{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:0; flex:2;">
+      <label>Tìm theo tên thiết bị</label>
+      <input type="search" name="q" value="{{ q }}" placeholder="VD: BSC, ADX...">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <button type="submit" class="btn btn-secondary">Lọc</button>
+    </div>
+  </form>
+</div>
+
+<form id="bulkDeleteForm" class="bulk-form" method="post" action="/devices/bulk-delete" data-item-label="thiết bị"></form>
+
+<div class="device-toolbar" style="margin-bottom:12px;">
+  <button type="submit" form="bulkDeleteForm" class="btn btn-danger btn-sm bulk-submit" disabled>Xoá đã chọn (<span class="bulk-count">0</span>)</button>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-wrap" style="border:none; border-radius:var(--radius-lg);">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px;"><input type="checkbox" class="bulk-select-all" data-form="bulkDeleteForm"></th>
+          <th>Trạm</th><th>Mục bảo dưỡng</th><th>Tên thiết bị</th><th>Số hồ sơ</th><th>Cấu hình</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in devices %}
+        <tr>
+          <td><input type="checkbox" class="bulk-item" data-form="bulkDeleteForm" name="device_ids" value="{{ d.id }}" form="bulkDeleteForm"></td>
+          <td>{{ d.station.code }}</td>
+          <td>{{ d.category.name }}</td>
+          <td><strong>{{ d.name }}</strong></td>
+          <td class="text-muted">{{ d.record_no }}</td>
+          <td class="text-muted">{{ d.configuration }}</td>
+          <td class="row-actions">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="togglePanel('edit-{{ d.id }}')">Sửa</button>
+            <form method="post" action="/devices/{{ d.id }}/delete" style="display:inline;" data-confirm="Xoá thiết bị {{ d.name }}?">
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red-600);">Xoá</button>
+            </form>
+          </td>
+        </tr>
+        <tr class="panel" id="edit-{{ d.id }}">
+          <td colspan="7" style="background:var(--gray-50);">
+            <form method="post" action="/devices/{{ d.id }}/edit" style="max-width:760px;">
+              <div class="field-row">
+                <div class="field">
+                  <label>Trạm</label>
+                  <select name="station_id" required>
+                    {% for s in stations %}<option value="{{ s.id }}" {{ "selected" if s.id == d.station_id }}>{{ s.code }} — {{ s.name }}</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Mục bảo dưỡng</label>
+                  <select name="category_id" required>
+                    {% for c in categories %}<option value="{{ c.id }}" {{ "selected" if c.id == d.category_id }}>{{ c.name }}</option>{% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>Tên thiết bị</label><input type="text" name="name" value="{{ d.name }}" required></div>
+                <div class="field"><label>Số hồ sơ</label><input type="text" name="record_no" value="{{ d.record_no }}"></div>
+                <div class="field"><label>Cấu hình</label><input type="text" name="configuration" value="{{ d.configuration }}"></div>
+              </div>
+              <div class="header-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Lưu thay đổi</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="togglePanel('edit-{{ d.id }}')">Đóng</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7"><div class="empty-state">Không có thiết bị nào khớp bộ lọc.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if total_pages > 1 %}
+<div class="header-actions" style="justify-content:center; margin-top:16px;">
+  {% for p in range(1, total_pages + 1) %}
+  <a class="btn btn-sm {{ 'btn-primary' if p == page else 'btn-secondary' }}"
+     href="/devices?page={{ p }}{% if filter_station_id %}&station_id={{ filter_station_id }}{% endif %}{% if filter_category_id %}&category_id={{ filter_category_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}">{{ p }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/bulk-delete.js"></script>
+{% endblock %}

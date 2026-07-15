@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Tạo hồ sơ bảo dưỡng{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Tạo hồ sơ bảo dưỡng</h1>
+    <p>Chọn trạm, mục bảo dưỡng, thông tin đợt bảo dưỡng và thiết bị cần tạo hồ sơ Word.</p>
+  </div>
+</div>
+
+{% if not stations %}
+<div class="card">
+  <div class="empty-state">
+    <div class="icon">📭</div>
+    <p>Chưa có dữ liệu trạm. Hãy nhập dữ liệu ở trang <a href="/devices">Thiết bị</a> hoặc thêm trạm ở trang <a href="/stations">Trạm viễn thông</a>.</p>
+  </div>
+</div>
+{% else %}
+<div class="steps">
+  <div class="step-card enabled" id="step1">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <div class="step-title">Trạm &amp; mục bảo dưỡng</div>
+    </div>
+    <div class="field-row">
+      <div class="field" style="margin-bottom:0;">
+        <label for="stationSelect">Trạm viễn thông</label>
+        <select id="stationSelect">
+          <option value="">-- Chọn trạm --</option>
+          {% for s in stations %}
+          <option value="{{ s.id }}">{{ s.code }} — {{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div id="categoryWrap" style="display:none; margin-top:16px;">
+      <label>Mục bảo dưỡng</label>
+      <div class="category-picker" id="categoryPicker"></div>
+      <div class="help-text" id="categoryEmptyHint" style="display:none;">
+        Trạm này chưa có thiết bị nào trong dữ liệu. Hãy thêm ở trang <a href="/devices">Thiết bị</a>.
+      </div>
+    </div>
+  </div>
+
+  <div class="step-card" id="step2">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <div class="step-title">Thông tin đợt bảo dưỡng</div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="maintenanceDate">Ngày bảo dưỡng</label>
+        <input type="date" id="maintenanceDate" value="{{ today }}">
+      </div>
+      <div class="field">
+        <label for="performedBy">Người thực hiện</label>
+        <select id="performedBy"><option value="">-- Chọn trạm trước --</option></select>
+      </div>
+      <div class="field">
+        <label for="coworker">Người phối hợp (nếu có)</label>
+        <select id="coworker"><option value="">-- Không có --</option></select>
+      </div>
+    </div>
+    <div class="help-text" id="peopleWarning" style="display:none; color:var(--red-600);">Người phối hợp phải khác Người thực hiện.</div>
+    <div class="help-text">Không thấy tên trong danh sách? Thêm nhân viên ở trang <a href="/employees">Nhân viên</a>.</div>
+  </div>
+
+  <div class="step-card" id="step3">
+    <div class="step-head">
+      <div class="step-num">3</div>
+      <div class="step-title">Chọn thiết bị</div>
+      <div class="step-hint"><span id="deviceSelectedCount">0</span>/<span id="deviceTotalCount">0</span> đã chọn</div>
+    </div>
+    <div class="device-toolbar">
+      <input type="search" id="deviceSearch" placeholder="Tìm thiết bị theo tên...">
+      <button type="button" class="btn btn-secondary btn-sm" id="selectAllBtn">Chọn tất cả</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="selectNoneBtn">Bỏ chọn tất cả</button>
+    </div>
+    <div class="device-list" id="deviceList">
+      <div class="device-empty">Hãy chọn trạm và mục bảo dưỡng ở bước 1.</div>
+    </div>
+  </div>
+
+  <div class="step-card" id="step4">
+    <div class="step-head">
+      <div class="step-num">4</div>
+      <div class="step-title">Tạo hồ sơ</div>
+    </div>
+    <button type="button" class="btn btn-primary" id="generateBtn" disabled>
+      <span id="generateBtnLabel">Tạo hồ sơ bảo dưỡng</span>
+    </button>
+    <div class="help-text" id="generateHint">Hoàn tất các bước trên để tiếp tục.</div>
+  </div>
+</div>
+
+<div id="resultCard"></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/generate.js"></script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Chi tiết lượt tạo file{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ run.station.code }} · {{ run.category.name }} · {{ run.maintenance_date | vndate }}</h1>
+    <p>Người thực hiện: {{ run.performed_by }}{% if run.coworker %} &amp; {{ run.coworker }}{% endif %} · Tạo lúc {{ run.created_at | vndatetime }}</p>
+  </div>
+  <div class="header-actions">
+    <a class="btn btn-secondary" href="/history">← Danh sách lịch sử</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-subtitle" style="margin-bottom:16px;">Thư mục lưu: {{ run.output_folder }}</div>
+  <div class="result-summary">
+    <div class="stat-card"><div class="stat-value">{{ run.requested_count }}</div><div class="stat-label">Yêu cầu</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--green-600)">{{ run.success_count }}</div><div class="stat-label">Thành công</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--amber-600)">{{ run.warning_count }}</div><div class="stat-label">Cảnh báo</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--red-600)">{{ run.error_count }}</div><div class="stat-label">Lỗi</div></div>
+  </div>
+  <div class="header-actions">
+    <a class="btn btn-primary" href="/history/{{ run.id }}/download">⬇ Tải về (ZIP)</a>
+    {% if can_open_locally %}
+    <form method="post" action="/history/{{ run.id }}/open-folder" style="display:inline;">
+      <button type="submit" class="btn btn-secondary">📂 Mở thư mục</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/history/{{ run.id }}/delete" style="display:inline; margin-left:auto;" data-confirm="Xoá lượt tạo file này? Các file Word đã tạo cũng sẽ bị xoá khỏi máy chủ.">
+      <button type="submit" class="btn btn-danger">Xoá lượt này</button>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-wrap" style="border:none; border-radius:var(--radius-lg);">
+    <table>
+      <thead><tr><th>Thiết bị</th><th>Tên file</th><th>Trạng thái</th><th>Ghi chú</th><th></th></tr></thead>
+      <tbody>
+        {% for f in files %}
+        <tr>
+          <td>{{ f.device_name_snapshot }}</td>
+          <td class="text-muted">{{ f.filename }}</td>
+          <td>
+            {% if f.status == "success" %}<span class="badge badge-success">✓ Thành công</span>
+            {% elif f.status == "warning" %}<span class="badge badge-warning">⚠ Cảnh báo</span>
+            {% else %}<span class="badge badge-danger">✗ Lỗi</span>{% endif %}
+          </td>
+          <td class="text-muted">{{ f.message }}</td>
+          <td class="row-actions">
+            {% if f.status != "error" %}<a class="btn btn-ghost btn-sm" href="/history/{{ run.id }}/files/{{ f.id }}/download">Tải file</a>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5"><div class="empty-state">Không có file nào.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Mục bảo dưỡng{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Mục bảo dưỡng &amp; mẫu Word</h1>
+    <p>Mỗi mục bảo dưỡng gắn với một file mẫu Word (.docx) chứa các thẻ [[ten_bien]]. Có thể thêm mục mới bất cứ lúc nào, không cần sửa code.</p>
+  </div>
+  <div class="header-actions">
+    <button type="button" class="btn btn-primary" onclick="togglePanel('addPanel')">+ Thêm mục bảo dưỡng</button>
+  </div>
+</div>
+
+<div class="panel card" id="addPanel">
+  <div class="card-title">Thêm mục bảo dưỡng mới</div>
+  <form method="post" action="/categories">
+    <div class="field-row">
+      <div class="field"><label>Tên mục</label><input type="text" name="name" required placeholder="VD: Nguồn điện"></div>
+      <div class="field"><label>Mã (viết tắt)</label><input type="text" name="code" required placeholder="VD: ND"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Tên thư mục lưu file</label><input type="text" name="output_folder_name" required placeholder="VD: Nguon dien"></div>
+      <div class="field"><label>Tiền tố tên file</label><input type="text" name="filename_prefix" required placeholder="VD: ND-C3-M"></div>
+    </div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('addPanel')">Huỷ</button>
+  </form>
+</div>
+
+<div class="card-grid">
+  {% for row in rows %}
+  <div class="card">
+    <div class="card-title">{{ row.category.name }} <span class="badge badge-neutral">{{ row.category.code }}</span></div>
+    <div class="card-subtitle">{{ row.device_count }} thiết bị · thư mục "{{ row.category.output_folder_name }}" · tiền tố "{{ row.category.filename_prefix }}"</div>
+
+    {% if row.template %}
+      <div class="badge badge-success" style="margin-bottom:14px;">✓ Đã có mẫu: {{ row.template.original_filename }}</div>
+    {% else %}
+      <div class="badge badge-warning" style="margin-bottom:14px;">⚠ Chưa có file mẫu Word</div>
+    {% endif %}
+
+    <form method="post" action="/categories/{{ row.category.id }}/template" enctype="multipart/form-data" style="margin-bottom:14px;">
+      <div class="field" style="margin-bottom:8px;">
+        <input type="file" name="template_file" accept=".docx" required>
+      </div>
+      <button type="submit" class="btn btn-secondary btn-sm">Tải lên / thay file mẫu (.docx)</button>
+    </form>
+
+    <div class="header-actions">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="togglePanel('edit-{{ row.category.id }}')">Sửa thông tin</button>
+      <form method="post" action="/categories/{{ row.category.id }}/toggle" style="display:inline;">
+        <button type="submit" class="btn btn-ghost btn-sm">{{ "Ngừng sử dụng" if row.category.active else "Kích hoạt lại" }}</button>
+      </form>
+      <form method="post" action="/categories/{{ row.category.id }}/delete" style="display:inline;" data-confirm="Xoá mục {{ row.category.name }}? Chỉ xoá được nếu chưa có thiết bị/lịch sử.">
+        <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red-600);">Xoá</button>
+      </form>
+    </div>
+
+    <div class="panel" id="edit-{{ row.category.id }}" style="margin-top:14px; border-top:1px solid var(--border); padding-top:14px;">
+      <form method="post" action="/categories/{{ row.category.id }}/edit">
+        <div class="field"><label>Tên mục</label><input type="text" name="name" value="{{ row.category.name }}" required></div>
+        <div class="field"><label>Mã (viết tắt)</label><input type="text" name="code" value="{{ row.category.code }}" required></div>
+        <div class="field"><label>Tên thư mục lưu file</label><input type="text" name="output_folder_name" value="{{ row.category.output_folder_name }}" required></div>
+        <div class="field"><label>Tiền tố tên file</label><input type="text" name="filename_prefix" value="{{ row.category.filename_prefix }}" required></div>
+        <button type="submit" class="btn btn-primary btn-sm">Lưu thay đổi</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="togglePanel('edit-{{ row.category.id }}')">Đóng</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="card"><div class="empty-state">Chưa có mục bảo dưỡng nào.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Cài đặt{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Cài đặt</h1>
+    <p>Cấu hình chung của ứng dụng.</p>
+  </div>
+</div>
+
+<div class="card" style="max-width:640px;">
+  <div class="card-title">Thư mục lưu hồ sơ đã tạo</div>
+  <p class="card-subtitle">
+    Nên chọn một đường dẫn ngắn (VD: <code>D:\BaoDuong</code>) thay vì thư mục lồng quá sâu, để danh sách file
+    trong Explorer luôn gọn gàng. Ứng dụng vẫn tự chống lỗi "đường dẫn quá dài" của Windows dù bạn chọn thư mục nào.
+  </p>
+  <form method="post" action="/settings/output-root">
+    <div class="field">
+      <label>Đường dẫn thư mục gốc</label>
+      <input type="text" name="output_root" value="{{ output_root }}">
+      <div class="help-text">Mặc định: {{ default_output_root }}</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+  </form>
+</div>
+
+<div class="card" style="max-width:640px;">
+  <div class="card-title">Về ứng dụng</div>
+  <p class="card-subtitle" style="margin-bottom:0;">
+    Ứng dụng thay thế công cụ Excel/VBA "Tạo file báo cáo bảo dưỡng" cũ. Dữ liệu (trạm, nhân viên, thiết bị,
+    mục bảo dưỡng, mẫu Word) được lưu trong cơ sở dữ liệu riêng của ứng dụng và có thể nhập/xuất lại từ Excel
+    ở trang Thiết bị.
+  </p>
+</div>
+{% endblock %}

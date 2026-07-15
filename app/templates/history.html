@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Lịch sử tạo file{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Lịch sử tạo file</h1>
+    <p>200 lượt tạo hồ sơ gần nhất.</p>
+  </div>
+</div>
+
+<form id="bulkDeleteRunForm" class="bulk-form" method="post" action="/history/bulk-delete" data-item-label="lượt tạo file"></form>
+<div class="device-toolbar" style="margin-bottom:12px;">
+  <button type="submit" form="bulkDeleteRunForm" class="btn btn-danger btn-sm bulk-submit" disabled>Xoá đã chọn (<span class="bulk-count">0</span>)</button>
+  <span class="help-text" style="margin:0;">Xoá sẽ xoá luôn các file Word đã tạo trong lượt đó khỏi máy chủ.</span>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-wrap" style="border:none; border-radius:var(--radius-lg);">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px;"><input type="checkbox" class="bulk-select-all" data-form="bulkDeleteRunForm"></th>
+          <th>Thời gian</th><th>Trạm</th><th>Mục bảo dưỡng</th><th>Ngày bảo dưỡng</th><th>Người thực hiện</th><th>Kết quả</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td><input type="checkbox" class="bulk-item" data-form="bulkDeleteRunForm" name="run_ids" value="{{ run.id }}" form="bulkDeleteRunForm"></td>
+          <td class="text-muted">{{ run.created_at | vndatetime }}</td>
+          <td>{{ run.station.code }}</td>
+          <td>{{ run.category.name }}</td>
+          <td>{{ run.maintenance_date | vndate }}</td>
+          <td>{{ run.performed_by }}{% if run.coworker %} &amp; {{ run.coworker }}{% endif %}</td>
+          <td>
+            <span class="badge badge-success">{{ run.success_count }}</span>
+            {% if run.warning_count %}<span class="badge badge-warning">{{ run.warning_count }}</span>{% endif %}
+            {% if run.error_count %}<span class="badge badge-danger">{{ run.error_count }}</span>{% endif %}
+            <span class="text-muted" style="font-size:12px;">/ {{ run.requested_count }}</span>
+          </td>
+          <td class="row-actions">
+            <a class="btn btn-ghost btn-sm" href="/history/{{ run.id }}">Chi tiết</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8"><div class="empty-state">Chưa có lượt tạo file nào.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/bulk-delete.js"></script>
+{% endblock %}

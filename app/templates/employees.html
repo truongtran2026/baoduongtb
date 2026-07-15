@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Nhân viên{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Nhân viên</h1>
+    <p>Danh sách nhân viên theo trạm, dùng để chọn Người thực hiện / Người phối hợp khi tạo hồ sơ.</p>
+  </div>
+  <div class="header-actions">
+    <a class="btn btn-secondary" href="/export-excel">⬇ Xuất Excel</a>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('importPanel')">⬆ Nhập từ Excel</button>
+    <button type="button" class="btn btn-primary" onclick="togglePanel('addPanel')">+ Thêm nhân viên</button>
+  </div>
+</div>
+
+<div class="card-grid" style="margin-bottom:20px;">
+  <div class="stat-card">
+    <div class="stat-value">{{ total }}</div>
+    <div class="stat-label">Nhân viên đang hiển thị (theo bộ lọc)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ grand_total }}</div>
+    <div class="stat-label">Tổng số nhân viên (tất cả trạm)</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/employees" class="field-row" style="align-items:end;">
+    <div class="field" style="margin-bottom:0;">
+      <label>Trạm</label>
+      <select name="station_id" onchange="this.form.submit()">
+        <option value="">Tất cả trạm</option>
+        {% for s in stations %}<option value="{{ s.id }}" {{ "selected" if filter_station_id == s.id }}>{{ s.code }} — {{ s.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:0; flex:2;">
+      <label>Tìm theo tên</label>
+      <input type="search" name="q" value="{{ q }}" placeholder="VD: Nguyễn...">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <button type="submit" class="btn btn-secondary">Lọc</button>
+    </div>
+  </form>
+</div>
+
+<div class="panel card" id="importPanel">
+  <div class="card-title">Nhập dữ liệu từ file Excel</div>
+  <p class="card-subtitle">
+    Dùng đúng file đã "Xuất Excel" trước đó (hoặc file cùng cấu trúc: các sheet "tram", "nhan vien", "muc",
+    "thiet bi"). Nhân viên có trong app mà không còn trong file sẽ tự động bị xoá — hãy chắc file bạn nhập là
+    bản đầy đủ, mới nhất.
+  </p>
+  <form method="post" action="/import-excel" enctype="multipart/form-data">
+    <input type="hidden" name="back_to" value="/employees">
+    <div class="field" style="max-width:420px;"><input type="file" name="excel_file" accept=".xlsx,.xlsm" required></div>
+    <button type="submit" class="btn btn-primary">Nhập dữ liệu</button>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('importPanel')">Huỷ</button>
+  </form>
+</div>
+
+<div class="panel card" id="addPanel">
+  <div class="card-title">Thêm nhân viên mới</div>
+  <form method="post" action="/employees">
+    <div class="field-row">
+      <div class="field"><label>Họ và tên</label><input type="text" name="name" required></div>
+      <div class="field">
+        <label>Trạm</label>
+        <select name="station_id" required>
+          {% for s in stations %}<option value="{{ s.id }}">{{ s.code }} — {{ s.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('addPanel')">Huỷ</button>
+  </form>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-wrap" style="border:none; border-radius:var(--radius-lg);">
+    <table>
+      <thead><tr><th>Họ và tên</th><th>Trạm</th><th>Trạng thái</th><th></th></tr></thead>
+      <tbody>
+        {% for e in employees %}
+        <tr>
+          <td><strong>{{ e.name }}</strong></td>
+          <td>{{ e.station.code }} — {{ e.station.name }}</td>
+          <td>
+            {% if e.active %}<span class="badge badge-success">Đang dùng</span>
+            {% else %}<span class="badge badge-neutral">Ngừng dùng</span>{% endif %}
+          </td>
+          <td class="row-actions">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="togglePanel('edit-{{ e.id }}')">Sửa</button>
+          </td>
+        </tr>
+        <tr class="panel" id="edit-{{ e.id }}">
+          <td colspan="4" style="background:var(--gray-50);">
+            <form method="post" action="/employees/{{ e.id }}/edit" style="max-width:560px;">
+              <div class="field-row">
+                <div class="field"><label>Họ và tên</label><input type="text" name="name" value="{{ e.name }}" required></div>
+                <div class="field">
+                  <label>Trạm</label>
+                  <select name="station_id" required>
+                    {% for s in stations %}<option value="{{ s.id }}" {{ "selected" if s.id == e.station_id }}>{{ s.code }} — {{ s.name }}</option>{% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="header-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Lưu thay đổi</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="togglePanel('edit-{{ e.id }}')">Đóng</button>
+                <form method="post" action="/employees/{{ e.id }}/toggle" style="display:inline;">
+                  <button type="submit" class="btn btn-secondary btn-sm">{{ "Ngừng sử dụng" if e.active else "Kích hoạt lại" }}</button>
+                </form>
+                <form method="post" action="/employees/{{ e.id }}/delete" style="display:inline;" data-confirm="Xoá nhân viên {{ e.name }}?">
+                  <button type="submit" class="btn btn-danger btn-sm">Xoá</button>
+                </form>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4"><div class="empty-state">Chưa có nhân viên nào.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Trạm viễn thông{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Trạm viễn thông</h1>
+    <p>Danh sách trạm dùng để lọc mục bảo dưỡng, nhân viên và thiết bị.</p>
+  </div>
+  <div class="header-actions">
+    <a class="btn btn-secondary" href="/export-excel">⬇ Xuất Excel</a>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('importPanel')">⬆ Nhập từ Excel</button>
+    <button type="button" class="btn btn-primary" onclick="togglePanel('addPanel')">+ Thêm trạm</button>
+  </div>
+</div>
+
+<div class="panel card" id="importPanel">
+  <div class="card-title">Nhập dữ liệu từ file Excel</div>
+  <p class="card-subtitle">
+    Dùng đúng file đã "Xuất Excel" trước đó (hoặc file cùng cấu trúc: các sheet "tram", "nhan vien", "muc",
+    "thiet bi"). Đây là nhập toàn bộ dữ liệu dùng chung (trạm, nhân viên, mục bảo dưỡng, thiết bị), không chỉ
+    riêng trạm.
+  </p>
+  <form method="post" action="/import-excel" enctype="multipart/form-data">
+    <input type="hidden" name="back_to" value="/stations">
+    <div class="field" style="max-width:420px;"><input type="file" name="excel_file" accept=".xlsx,.xlsm" required></div>
+    <button type="submit" class="btn btn-primary">Nhập dữ liệu</button>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('importPanel')">Huỷ</button>
+  </form>
+</div>
+
+<div class="panel card" id="addPanel">
+  <div class="card-title">Thêm trạm mới</div>
+  <form method="post" action="/stations">
+    <div class="field-row">
+      <div class="field"><label>Mã trạm</label><input type="text" name="code" required placeholder="VD: ADN1"></div>
+      <div class="field"><label>Tên trạm</label><input type="text" name="name" required placeholder="VD: Trạm An Đồn 1"></div>
+      <div class="field"><label>Đài</label><input type="text" name="center" placeholder="VD: Đài VT ĐNG"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Địa chỉ</label><input type="text" name="address"></div>
+      <div class="field"><label>Tọa độ</label><input type="text" name="coordinates"></div>
+    </div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <button type="button" class="btn btn-secondary" onclick="togglePanel('addPanel')">Huỷ</button>
+  </form>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-wrap" style="border:none; border-radius:var(--radius-lg);">
+    <table>
+      <thead>
+        <tr><th>Mã trạm</th><th>Tên trạm</th><th>Đài</th><th>Địa chỉ</th><th>Nhân viên</th><th>Thiết bị</th><th>Trạng thái</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><strong><a href="/stations/{{ row.station.id }}">{{ row.station.code }}</a></strong></td>
+          <td><a href="/stations/{{ row.station.id }}">{{ row.station.name }}</a></td>
+          <td class="text-muted">{{ row.station.center }}</td>
+          <td class="text-muted">{{ row.station.address }}</td>
+          <td>{{ row.employee_count }}</td>
+          <td>{{ row.device_count }}</td>
+          <td>
+            {% if row.station.active %}<span class="badge badge-success">Đang dùng</span>
+            {% else %}<span class="badge badge-neutral">Ngừng dùng</span>{% endif %}
+          </td>
+          <td class="row-actions">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="togglePanel('edit-{{ row.station.id }}')">Sửa</button>
+          </td>
+        </tr>
+        <tr class="panel" id="edit-{{ row.station.id }}">
+          <td colspan="8" style="background:var(--gray-50);">
+            <form method="post" action="/stations/{{ row.station.id }}/edit" style="max-width:720px;">
+              <div class="field-row">
+                <div class="field"><label>Mã trạm</label><input type="text" name="code" value="{{ row.station.code }}" required></div>
+                <div class="field"><label>Tên trạm</label><input type="text" name="name" value="{{ row.station.name }}" required></div>
+                <div class="field"><label>Đài</label><input type="text" name="center" value="{{ row.station.center }}"></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>Địa chỉ</label><input type="text" name="address" value="{{ row.station.address }}"></div>
+                <div class="field"><label>Tọa độ</label><input type="text" name="coordinates" value="{{ row.station.coordinates }}"></div>
+              </div>
+              <div class="header-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Lưu thay đổi</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="togglePanel('edit-{{ row.station.id }}')">Đóng</button>
+                <form method="post" action="/stations/{{ row.station.id }}/toggle" style="display:inline;">
+                  <button type="submit" class="btn btn-secondary btn-sm">{{ "Ngừng sử dụng" if row.station.active else "Kích hoạt lại" }}</button>
+                </form>
+                <form method="post" action="/stations/{{ row.station.id }}/delete" style="display:inline;" data-confirm="Xoá trạm {{ row.station.code }}? Chỉ xoá được nếu chưa có lịch sử tạo file.">
+                  <button type="submit" class="btn btn-danger btn-sm">Xoá</button>
+                </form>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8"><div class="empty-state">Chưa có trạm nào. Nhập từ Excel hoặc thêm thủ công.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

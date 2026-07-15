@@ -1,0 +1,29 @@
+# --- Python / environment ---
+venv/
+__pycache__/
+*.pyc
+
+# --- Real organizational data: never publish (this repo is public) ---
+# Database (stations, employees, devices - all real)
+app/data/app.db
+app/data/app.db.bak*
+app/data/*.db
+app/data/*.db-journal
+
+# Uploaded Word templates (real org letterhead/process docs)
+app/data/word_templates/*
+!app/data/word_templates/.gitkeep
+
+# Generated maintenance reports (real device/employee data)
+app/data/output/**
+!app/data/output/.gitkeep
+
+# Any Excel workbook anywhere in the repo - these only ever hold real
+# station/employee/device data (exports, re-imports, working copies), never
+# source code. Belt-and-suspenders beyond the folder-specific rules above.
+*.xlsx
+*.xlsm
+*.xlsb
+
+# Working folder used for the Export/Import Excel round-trip
+thietbi/
