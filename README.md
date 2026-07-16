@@ -121,8 +121,12 @@ vượt quá giới hạn 260 ký tự của Windows khiến Word.SaveAs báo l�
 
 Mọi dữ liệu (trạm, nhân viên, thiết bị, mục bảo dưỡng, file mẫu Word, hồ sơ đã tạo, lịch sử) nằm trong **cơ sở
 dữ liệu** — không nằm rải rác trên ổ đĩa. Ở chế độ LAN đó là 1 file duy nhất `app/data/app.db`; sao lưu định kỳ
-chỉ cần copy file này. Ở chế độ cloud đó là database Postgres đã kết nối — sao lưu theo cách của nhà cung cấp
-Postgres bạn dùng (Vercel/Neon/Supabase đều có tính năng backup tự động).
+chỉ cần copy file này. Ở chế độ cloud đó là database Postgres đã kết nối — **tự backup tự động hay không tuỳ
+gói/nhà cung cấp**, không phải mặc định có sẵn: ví dụ Supabase free tier **không** tự động backup (chỉ có ở
+gói trả phí). Kiểm tra kỹ mục backup của gói bạn đang dùng; nếu không có, dùng nút **⬇ Xuất Excel** định kỳ
+(trang Trạm/Nhân viên/Thiết bị) rồi lưu file `.xlsx` ra một nơi an toàn — bù được phần dữ liệu trạm/nhân
+viên/thiết bị, nhưng không bù được file mẫu Word đã tải lên hay lịch sử tạo file (2 phần đó chỉ nằm trong
+database).
 
 Riêng ở chế độ LAN, mỗi hồ sơ Word tạo ra còn được ghi thêm 1 bản trên ổ đĩa tại `app/data/output/<mục bảo
 dưỡng>/` để có thể "Mở thư mục" xem trực tiếp bằng Explorer — bản ghi trong database mới là bản chính, bản trên
