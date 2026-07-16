@@ -19,18 +19,24 @@ def list_categories(request: Request, db: Session = Depends(get_db)):
     device_counts = dict(
         db.query(models.Device.category_id, func.count(models.Device.id)).group_by(models.Device.category_id).all()
     )
-    rows = []
-    for c in categories:
-        active_template = (
-            db.query(models.WordTemplate).filter_by(category_id=c.id, is_active=True).order_by(models.WordTemplate.uploaded_at.desc()).first()
-        )
-        rows.append(
-            {
-                "category": c,
-                "device_count": device_counts.get(c.id, 0),
-                "template": active_template,
-            }
-        )
+    # One query for every category's active template instead of one query
+    # per category - matters a lot more against a networked database (cloud
+    # deployment) than it did locally against SQLite. Iterating newest-first
+    # and using setdefault (instead of a plain dict comprehension, which
+    # would keep the *last* write) preserves the old per-category query's
+    # "most recently uploaded active template wins" behavior for the
+    # never-expected-but-defensive case of more than one active row.
+    active_templates: dict[int, models.WordTemplate] = {}
+    for t in db.query(models.WordTemplate).filter_by(is_active=True).order_by(models.WordTemplate.uploaded_at.desc()).all():
+        active_templates.setdefault(t.category_id, t)
+    rows = [
+        {
+            "category": c,
+            "device_count": device_counts.get(c.id, 0),
+            "template": active_templates.get(c.id),
+        }
+        for c in categories
+    ]
     return templates.TemplateResponse(
         "categories.html",
         {"request": request, "rows": rows, "active_nav": "categories"},
