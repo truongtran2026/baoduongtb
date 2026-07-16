@@ -12,6 +12,15 @@ instead of left behind - see import_devices() / import_employees(). Neither
 table is referenced by history (generation runs only keep a text snapshot of
 names), so this is safe. Stations and categories are never auto-deleted this
 way since real history rows do reference them by id.
+
+Every import_* function below loads its existing rows with a *single* query
+up front and matches against an in-memory dict from then on, instead of
+querying per Excel row. That distinction is invisible against local SQLite
+(same process, no network) but matters a lot against a networked database
+(Postgres on Vercel/Neon): a few hundred devices used to mean a few hundred
+round trips, easily enough to blow past a serverless function's execution
+time limit and get killed before the single commit() at the end ever runs -
+which looks like "the import silently did nothing."
 """
 import uuid
 from dataclasses import dataclass, field
@@ -55,6 +64,7 @@ def _cell_str(ws, row, col) -> str:
 
 
 def import_stations(db: Session, ws, summary: ImportSummary) -> dict[str, models.Station]:
+    existing = {s.code: s for s in db.query(models.Station).all()}
     by_code: dict[str, models.Station] = {}
     row = 2
     while True:
@@ -66,10 +76,11 @@ def import_stations(db: Session, ws, summary: ImportSummary) -> dict[str, models
         address = _cell_str(ws, row, 4)
         coordinates = _cell_str(ws, row, 5)
 
-        station = db.query(models.Station).filter_by(code=code).one_or_none()
+        station = existing.get(code)
         if station is None:
             station = models.Station(code=code)
             db.add(station)
+            existing[code] = station
         station.name = name
         station.center = center
         station.address = address
@@ -83,6 +94,7 @@ def import_stations(db: Session, ws, summary: ImportSummary) -> dict[str, models
 
 
 def import_employees(db: Session, ws, stations_by_code: dict[str, models.Station], summary: ImportSummary):
+    existing = {(e.name, e.station_id): e for e in db.query(models.Employee).all()}
     seen_names_by_station: dict[int, set[str]] = {}
     row = 2
     while True:
@@ -96,27 +108,22 @@ def import_employees(db: Session, ws, stations_by_code: dict[str, models.Station
                 summary.warnings.append(f"Nhân viên '{name}': không tìm thấy trạm '{station_code}', bỏ qua")
             else:
                 seen_names_by_station.setdefault(station.id, set()).add(name)
-                emp = (
-                    db.query(models.Employee)
-                    .filter_by(name=name, station_id=station.id)
-                    .one_or_none()
-                )
+                key = (name, station.id)
+                emp = existing.get(key)
                 if emp is None:
                     emp = models.Employee(name=name, station_id=station.id)
                     db.add(emp)
+                    existing[key] = emp
                 summary.employees += 1
         row += 1
     db.flush()
 
     # Same "sheet is the full list for what it covers" rule as devices: a
     # station whose employees appear in this sheet has its removed employees
-    # deleted, not left behind.
+    # deleted, not left behind. Filtered from the dict already loaded above,
+    # not a fresh query per station.
     for station_id, names in seen_names_by_station.items():
-        stale = (
-            db.query(models.Employee)
-            .filter(models.Employee.station_id == station_id, models.Employee.name.notin_(names))
-            .all()
-        )
+        stale = [e for (nm, s_id), e in existing.items() if s_id == station_id and nm not in names]
         for e in stale:
             db.delete(e)
             summary.employees_deleted += 1
@@ -124,6 +131,7 @@ def import_employees(db: Session, ws, stations_by_code: dict[str, models.Station
 
 
 def import_categories(db: Session, ws, summary: ImportSummary) -> dict[str, models.Category]:
+    existing = {c.code: c for c in db.query(models.Category).all()}
     by_code: dict[str, models.Category] = {}
     row = 2
     order = 0
@@ -134,10 +142,11 @@ def import_categories(db: Session, ws, summary: ImportSummary) -> dict[str, mode
             break
         folder, prefix = FOLDER_AND_PREFIX_BY_CODE.get(code, (name, f"{code}-C3-M"))
 
-        cat = db.query(models.Category).filter_by(code=code).one_or_none()
+        cat = existing.get(code)
         if cat is None:
             cat = models.Category(code=code)
             db.add(cat)
+            existing[code] = cat
         cat.name = name
         cat.output_folder_name = folder
         cat.filename_prefix = prefix
@@ -154,6 +163,7 @@ def import_categories(db: Session, ws, summary: ImportSummary) -> dict[str, mode
 
 def import_devices(db: Session, ws, stations_by_code: dict[str, models.Station],
                     categories_by_key: dict[str, models.Category], summary: ImportSummary):
+    existing = {(d.station_id, d.category_id, d.name): d for d in db.query(models.Device).all()}
     # Tracks which (station, category) combos this sheet actually covers, and
     # which device names were seen for each - used below to delete devices
     # that were removed from the source instead of leaving stale rows behind.
@@ -190,14 +200,12 @@ def import_devices(db: Session, ws, stations_by_code: dict[str, models.Station],
 
         if device_name:
             seen_names.setdefault((station.id, category.id), set()).add(device_name)
-            device = (
-                db.query(models.Device)
-                .filter_by(station_id=station.id, category_id=category.id, name=device_name)
-                .one_or_none()
-            )
+            key = (station.id, category.id, device_name)
+            device = existing.get(key)
             if device is None:
                 device = models.Device(station_id=station.id, category_id=category.id, name=device_name)
                 db.add(device)
+                existing[key] = device
             device.record_no = record_no
             device.configuration = configuration
             summary.devices += 1
@@ -207,17 +215,13 @@ def import_devices(db: Session, ws, stations_by_code: dict[str, models.Station],
     # A (station, category) combo that appears in this sheet is treated as the
     # authoritative full list for that combo: anything still in the DB for
     # that combo but no longer present in the sheet has been removed/renamed
-    # at the source, so delete it outright.
+    # at the source, so delete it outright. Filtered from the dict already
+    # loaded above, not a fresh query per (station, category) pair.
     for (station_id, category_id), names in seen_names.items():
-        stale = (
-            db.query(models.Device)
-            .filter(
-                models.Device.station_id == station_id,
-                models.Device.category_id == category_id,
-                models.Device.name.notin_(names),
-            )
-            .all()
-        )
+        stale = [
+            d for (s_id, c_id, nm), d in existing.items()
+            if s_id == station_id and c_id == category_id and nm not in names
+        ]
         for d in stale:
             db.delete(d)
             summary.devices_deleted += 1
