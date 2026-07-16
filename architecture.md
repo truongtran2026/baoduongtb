@@ -292,12 +292,22 @@ mặc định để quay về" khác nhau.
 
 - **Không có bộ test tự động** (không pytest, không `tests/`). Mọi thay đổi trong quá trình phát triển
   được kiểm chứng thủ công: chạy uvicorn cục bộ rồi gọi qua `curl`/trình duyệt, hoặc soi thẳng file SQLite.
-- **Độ trễ ở chế độ cloud có phần vốn dĩ, không sửa được bằng code**: serverless function có cold start
-  (container mới phải import lại toàn bộ app), và nếu Postgres là Neon (hoặc tương tự có auto-suspend),
-  lần truy vấn đầu tiên sau một thời gian không hoạt động phải đợi database "thức dậy" trước khi trả kết
-  quả — cảm giác "load dữ liệu hơi chậm" ở lần đầu vào lại sau một lúc không dùng phần lớn đến từ đây, không
-  phải một truy vấn N+1 còn sót (đã rà soát toàn bộ `app/routers/*.py`, chỉ còn đúng 1 chỗ có N+1 nhỏ —
-  danh sách template active ở trang Mục bảo dưỡng — và đã sửa).
+- **Độ trễ ở chế độ cloud phần lớn phụ thuộc chính sách auto-suspend của nhà cung cấp Postgres, không
+  phải lỗi code**: serverless function bản thân có cold start (container mới phải import lại toàn bộ app,
+  thường dưới 1s), nhưng phần cảm nhận rõ nhất là database "ngủ" — Neon bản free mặc định tạm dừng compute
+  chỉ sau ~5 phút không hoạt động, nên truy vấn đầu tiên sau đó phải đợi "đánh thức" (có thể vài giây).
+  Supabase bản free chỉ tạm dừng cả dự án sau khoảng 1 tuần hoàn toàn không có traffic, nên trong sử dụng
+  hàng ngày gần như không bao giờ bị lạnh — cùng kiến trúc, cùng dữ liệu, nhưng cảm nhận nhanh/chậm khác hẳn
+  nhau tuỳ nhà cung cấp (đã xác nhận thực tế: chuyển từ Neon sang Supabase thấy nhanh hẳn). Không phải một
+  truy vấn N+1 còn sót — đã rà soát toàn bộ `app/routers/*.py`, chỉ có đúng 1 chỗ N+1 nhỏ (danh sách
+  template active ở trang Mục bảo dưỡng) và đã sửa. Đổi nhà cung cấp Postgres không cần sửa code (xem bảng
+  so sánh chế độ triển khai ở đầu file) — chỉ cần đổi `DATABASE_URL` trên Vercel.
+- **Supabase + connection pooling (Supavisor, Transaction mode) có thể xung đột với prepared statement tự
+  động của `psycopg` v3**: driver tự tạo prepared statement phía server sau vài lần chạy cùng câu lệnh
+  (mặc định `prepare_threshold=5`), điều này không tương thích với pooler ở chế độ Transaction (mỗi
+  transaction có thể được cấp một kết nối backend khác nhau) — biểu hiện là lỗi ngắt quãng dạng `prepared
+  statement "..." does not exist`. Nếu dùng Supabase, cần truyền `prepare_threshold=None` vào `connect_args`
+  của `create_engine()` trong `database.py` để tắt tính năng này.
 - **Giới hạn thời gian chạy của serverless function** (mặc định ~10s trên Vercel): bất kỳ thao tác hàng
   loạt mới nào (nhập Excel, sinh hàng trăm file cùng lúc...) cần giữ nguyên khuôn mẫu "1 query nạp trước"
   đã áp dụng cho `excel_import.py`, tránh N+1 lặp lại.
